@@ -10,7 +10,7 @@ from aiogram.types import ReplyKeyboardRemove, \
     ReplyKeyboardMarkup, KeyboardButton, \
     InlineKeyboardMarkup, InlineKeyboardButton
 
-from services import is_correct_ticker, add_new_user, add_new_coin, get_coin_list
+from services import is_correct_ticker, add_new_user, add_new_coin, get_coin_list, get_all_coins, delete_users_coin, finish, create_inline_button_to_delete
 
 
 logging.basicConfig(level=logging.INFO)
@@ -57,12 +57,8 @@ async def help(message: types.Message):
 @dp.message_handler(Text('Add Coin'))
 async def add_coin(message: types.Message):
     """Add Coin Command"""
-    btn_finish = KeyboardButton('Finish')
-    finish_kb = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    finish_kb.add(btn_finish)
 
-
-    await message.reply('Send pair(for example, BTCUSDT, DOGEUSDT OR LTCUSDT)', reply_markup=finish_kb)
+    await message.reply('Send pair(for example, BTCUSDT, DOGEUSDT OR LTCUSDT)', reply_markup=finish())
     await AddCoin.coin_name.set()
 
 
@@ -76,31 +72,46 @@ async def save_coin(message: types.Message, state: FSMContext):
         if is_correct_ticker(ticker) == False:
             await message.reply('Incorrect ticker, try again')
         else:
-            if add_new_coin(message.from_user.id, ticker) == 'ticker already added':
-                await message.reply(add_new_coin(message.from_user.id, ticker))
-            else:
-                await message.reply(f'{ticker} added!', )
-                add_new_coin(message.from_user.id, ticker)
+            await message.reply(add_new_coin(message.from_user.id, ticker))
 
-                await message.reply(is_correct_ticker(ticker))
+
     if message.text == 'Finish':
         await state.finish()
         await message.reply('OKAY! I went to monitor!', reply_markup=main_kb)
-
 
 
 @dp.message_handler(commands=['delete_coin'])
 @dp.message_handler(Text('Delete Coin'))
 async def delete_coin(message: types.Message):
     """Delete Coin Command"""
-    pass
+    try:
+        await message.reply('What do you want to delete?', reply_markup=create_inline_button_to_delete(message.from_user.id))
+        await message.reply('if you want to stop press finish', reply_markup=ReplyKeyboardRemove())
+    except:
+        await message.reply("Sorry, you don't have any coins (")
+
+
+@dp.callback_query_handler()
+async def delete_coin_callback(callback_query: types.CallbackQuery):
+
+    if callback_query.data != 'finish':
+        try:
+            delete_users_coin(userid=callback_query.from_user.id, ticker=callback_query.data)
+            await callback_query.answer(f'{callback_query.data} deleted', show_alert=False)
+            await callback_query.message.edit_text('What do you want to delete?',
+                                             reply_markup=create_inline_button_to_delete(callback_query.from_user.id))
+        except TypeError:
+            await callback_query.message.delete()
+            await bot.send_message(callback_query.from_user.id, "you removed all the coins. What's next?", reply_markup=main_kb)
+    else:
+        await callback_query.message.delete()
+        await bot.send_message(callback_query.from_user.id, "What's next?", reply_markup=main_kb)
 
 
 @dp.message_handler(commands=['coin_list'])
 @dp.message_handler(Text('Coin List'))
 async def coin_list(message: types.Message):
     """Coin List Command"""
-    # await coin_list()
     await message.reply(get_coin_list(message.from_user.id))
 
 

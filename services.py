@@ -3,6 +3,10 @@ import requests
 import pyrebase
 from collections.abc import Mapping
 from config import firebaseConfig
+from aiogram.types import ReplyKeyboardRemove, \
+    ReplyKeyboardMarkup, KeyboardButton, \
+    InlineKeyboardMarkup, InlineKeyboardButton
+
 
 firebase = pyrebase.initialize_app(firebaseConfig)
 db = firebase.database()
@@ -15,7 +19,7 @@ def is_correct_ticker(ticker):
         url = binance_api+symbol
         data = requests.get(url)
         data = data.json()
-        return f'{data["symbol"]} price is {data["price"]}'
+        return data["price"]
     except:
         return False
 
@@ -35,23 +39,62 @@ def add_new_coin(userid, ticker):
     tickers = db.child('users').child(userid).child('tickers').get()
     try:
         if ticker in tickers.val():
-            return 'ticker already added'
+            return f'{ticker} is already added'
         else:
             ticker_id = len(tickers.val())
             data = {ticker_id: ticker}
-            return db.child('users').child(userid).child('tickers').update(data)
+            db.child('users').child(userid).child('tickers').update(data)
+            return f'{ticker} added'
     except:
         data = {1: ticker}
-        return db.child('users').child(userid).child('tickers').set(data)
+        db.child('users').child(userid).child('tickers').set(data)
+        return f'{ticker} added'
+
+
+def get_all_coins(userid):
+    try:
+        tickers = db.child('users').child(userid).child('tickers').get()
+        tickers_list = []
+        for ticker in tickers.each():
+            tickerval = ticker.val()
+            if tickerval != None:
+                tickers_list.append(tickerval)
+        return tickers_list
+    except:
+        return ValueError
 
 
 def get_coin_list(userid):
-    tickers = db.child('users').child(userid).child('tickers').get()
-    tickers_list = []
-    for ticker in tickers.each():
-        tickerval = ticker.val()
-        if tickerval != None:
-            tickers_list.append(tickerval)
-    print(tickers_list)
-    tickers_str = '\n\n'.join(tickers_list)
-    return f'{tickers_str}'
+    try:
+        coin_price = []
+        for coin in get_all_coins(userid):
+            coin_price.append(f'{coin} price {is_correct_ticker(coin)}')
+        tickers_str = '\n\n'.join(coin_price)
+        return f'{tickers_str}'
+    except:
+        return 'you don\'t have any coins'
+
+
+def delete_users_coin(userid, ticker):
+    tickers_db = db.child('users').child(userid).child('tickers').get()
+    for tickers in tickers_db.each():
+
+        if tickers.val() == ticker:
+            key = tickers.key()
+
+            return db.child('users').child(userid).child('tickers').child(key).remove()
+
+
+def finish():
+    btn_finish = KeyboardButton('Finish')
+    finish_kb = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    return finish_kb.add(btn_finish)
+
+
+def create_inline_button_to_delete(user_id):
+    markup = InlineKeyboardMarkup()
+    all_coins = get_all_coins(user_id)
+    for coin in all_coins:
+        markup.add(InlineKeyboardButton(text=coin, callback_data=f'{coin}'))
+    markup.add(InlineKeyboardButton(text='Finish', callback_data='finish'))
+    return markup
