@@ -71,7 +71,7 @@ def get_coin_list(userid):
         tickers_str = '\n\n'.join(coin_price)
         return f'{tickers_str}'
     except:
-        return "Sorry, you don't have any coins ("
+        return False
 
 
 def delete_users_coin(userid, ticker):
@@ -97,7 +97,7 @@ def delete_coins_inline_kb(user_id):
         all_coins = get_all_coins(user_id)
         for coin in all_coins:
             markup.add(InlineKeyboardButton(text=coin, callback_data=f'ticker_{coin}'))
-        markup.add(InlineKeyboardButton(text='Finish', callback_data='finish'))
+        markup.add(InlineKeyboardButton(text='Back to Main Menu', callback_data='main_menu'))
         return markup
     except:
         return False
@@ -107,12 +107,12 @@ def main_inline_kb():
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton(text='Add Coin', callback_data='add_coin'))
     markup.add(InlineKeyboardButton(text='Delete Coin', callback_data='delete_coin'))
-    markup.add(InlineKeyboardButton(text='Account', callback_data='account'))
+    markup.add(InlineKeyboardButton(text='Coin List', callback_data='coin_list'))
     markup.add(InlineKeyboardButton(text='Price Sending Schedule', callback_data='price_sending'))
     return markup
 
 
-def back_to_account_inline_kb():
+def back_to_main_menu_inline_kb():
     markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton(text='Back to Account', callback_data='account'))
+    markup.add(InlineKeyboardButton(text='Back to Main Menu', callback_data='main_menu'))
     return markup

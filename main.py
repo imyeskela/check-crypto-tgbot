@@ -16,7 +16,7 @@ from services import is_correct_ticker, add_new_user, \
     add_new_coin, get_coin_list, \
     get_all_coins, delete_users_coin, \
     finish, delete_coins_inline_kb, main_inline_kb, \
-    back_to_account_inline_kb
+    back_to_main_menu_inline_kb
 
 
 logging.basicConfig(level=logging.INFO)
@@ -39,36 +39,26 @@ async def send_welcome(message: types.Message):
     add_new_user(message.from_user.id)
     await message.reply("Hi! I'm Chypto - Check Crypto Bot."
                         "\nI will send you abnormal volumes and price of the coin", reply_markup=main_inline_kb())
-    # await message.reply("Commands:"
-    #                     "\n/coin_list - see the list of added coins"
-    #                     "\n/add_coin - add coin"
-    #                     "\n/delete_coin - delete coin"
-    #                     "\n/help - help is help")
+
 
 
 @dp.message_handler(commands=['main_menu'])
-@dp.message_handler(Text('main_menu'))
-async def help(message: types.Message):
-    pass
-
-
-async def _add_coin_send_message(user_id):
-    await bot.send_message(user_id,
-                           'Send pair(for example, BTCUSDT, DOGEUSDT OR LTCUSDT)', reply_markup=finish())
-    await AddCoin.coin_name.set()
-
+@dp.callback_query_handler(Text('main_menu'))
+async def main_menu(callback_query: types.CallbackQuery):
+    try:
+        await callback_query.message.edit_text('Chypto — Check Crypto Bot'
+                                         '\nMain Menu', reply_markup=main_inline_kb())
+    except:
+        await bot.send_message(callback_query.from_user.id, 'Chypto — Check Crypto Bot'
+                                                            '\nMain Menu', reply_markup=main_inline_kb())
 
 
 @dp.callback_query_handler(Text('add_coin'))
 async def add_coin(callback_query: types.CallbackQuery):
     """Add Coin Command"""
-    user_id = callback_query.from_user.id
-    try:
-        await callback_query.message.delete()
-        await _add_coin_send_message(user_id)
-    except AttributeError:
-        await _add_coin_send_message(user_id)
-
+    await callback_query.message.delete()
+    await bot.send_message(callback_query.from_user.id, 'Send pair(for example, BTCUSDT, DOGEUSDT OR LTCUSDT)', reply_markup=finish())
+    await AddCoin.coin_name.set()
 
 
 @dp.message_handler(state=AddCoin.coin_name)
@@ -78,17 +68,14 @@ async def save_coin(message: types.Message, state: FSMContext):
     await state.update_data(coin_name=ticker)
 
     if message.text and message.text != 'Finish':
-        if is_correct_ticker(ticker) == False:
-
-            await message.reply('Incorrect ticker, try again')
-        else:
+        if is_correct_ticker(ticker) != False:
             await message.reply(add_new_coin(message.from_user.id, ticker))
-
+        else:
+            await message.reply('Incorrect ticker, try again')
 
     if message.text == 'Finish':
         await state.finish()
-        await message.reply('OKAY! I went to monitor!', reply_markup=main_inline_kb())
-
+        await message.reply('OKAY! I went to monitor!', reply_markup=back_to_main_menu_inline_kb())
 
 
 @dp.callback_query_handler(Text('delete_coin'))
@@ -96,22 +83,15 @@ async def delete_coin(callback_query: types.CallbackQuery):
     """Delete Coin Command"""
     user_id = callback_query.from_user.id
     if delete_coins_inline_kb(user_id=user_id) is not False:
-        try:
-            await callback_query.message.edit_text('What do you want to delete?',
-                           reply_markup=delete_coins_inline_kb(user_id))
-        except AttributeError:
-            await bot.send_message(user_id,
-                           'What do you want to delete?',
-                           reply_markup=delete_coins_inline_kb(user_id))
+        await callback_query.message.edit_text('What do you want to delete?',
+                                               reply_markup=delete_coins_inline_kb(user_id))
     else:
         await callback_query.message.edit_text( "Sorry, you don't have any coins (",
-                                                reply_markup=back_to_account_inline_kb())
-
+                                                reply_markup=back_to_main_menu_inline_kb())
 
 
 @dp.callback_query_handler(Text(startswith='ticker_'))
 async def delete_coin_callback(callback_query: types.CallbackQuery):
-
     try:
         ticker = callback_query.data.split('_')[1]
         delete_users_coin(userid=callback_query.from_user.id, ticker=ticker)
@@ -119,28 +99,18 @@ async def delete_coin_callback(callback_query: types.CallbackQuery):
         await callback_query.message.edit_text('What do you want to delete?',
                                                reply_markup=delete_coins_inline_kb(callback_query.from_user.id))
     except:
-        await callback_query.message.edit_text("You removed all the coins. What's next?", reply_markup=main_inline_kb())
+        await callback_query.message.edit_text("You removed all the coins. What's next?", reply_markup=back_to_main_menu_inline_kb())
 
 
-@dp.callback_query_handler(Text('finish'))
-async def delete_coin_callback(callback_query: types.CallbackQuery):
-    await callback_query.message.delete()
-    await bot.send_message(callback_query.from_user.id, "What's next?", reply_markup=main_inline_kb())
-
-
-async def _get_coin_list(user_id):
-    return await bot.send_message(user_id, get_coin_list(user_id), reply_markup=main_inline_kb())
-
-
-@dp.callback_query_handler(Text('account'))
+@dp.callback_query_handler(Text('coin_list'))
 async def coin_list(callback_query: types.CallbackQuery):
     """Coin List Command"""
     user_id = callback_query.from_user.id
-    try:
-        await callback_query.message.edit_text(get_coin_list(user_id), reply_markup=main_inline_kb())
-    except:
-        await bot.send_message(user_id, get_coin_list(user_id), reply_markup=main_inline_kb())
-
+    coins = get_coin_list(user_id)
+    if coins != False:
+        await callback_query.message.edit_text(coins, reply_markup=back_to_main_menu_inline_kb())
+    else:
+        await callback_query.message.edit_text('Here you can see the coins that have been added', reply_markup=back_to_main_menu_inline_kb())
 
 
 async def price_sending_schedule(message: types.Message):
