@@ -1,4 +1,6 @@
 import logging
+
+import aiogram.utils.exceptions
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Text
@@ -10,7 +12,11 @@ from aiogram.types import ReplyKeyboardRemove, \
     ReplyKeyboardMarkup, KeyboardButton, \
     InlineKeyboardMarkup, InlineKeyboardButton
 
-from services import is_correct_ticker, add_new_user, add_new_coin, get_coin_list, get_all_coins, delete_users_coin, finish, create_inline_button_to_delete
+from services import is_correct_ticker, add_new_user, \
+    add_new_coin, get_coin_list, \
+    get_all_coins, delete_users_coin, \
+    finish, delete_coins_inline_kb, main_inline_kb, \
+    back_to_account_inline_kb
 
 
 logging.basicConfig(level=logging.INFO)
@@ -31,35 +37,38 @@ async def send_welcome(message: types.Message):
     """First Command"""
 
     add_new_user(message.from_user.id)
-
-
     await message.reply("Hi! I'm Chypto - Check Crypto Bot."
-                        "\nI will send you abnormal volumes and price of the coin", reply_markup=main_kb)
-    await message.reply("Commands:"
-                        "\n/coin_list - see the list of added coins"
-                        "\n/add_coin - add coin"
-                        "\n/delete_coin - delete coin"
-                        "\n/help - help is help")
+                        "\nI will send you abnormal volumes and price of the coin", reply_markup=main_inline_kb())
+    # await message.reply("Commands:"
+    #                     "\n/coin_list - see the list of added coins"
+    #                     "\n/add_coin - add coin"
+    #                     "\n/delete_coin - delete coin"
+    #                     "\n/help - help is help")
 
 
-@dp.message_handler(commands=['help'])
-@dp.message_handler(Text('Help'))
+@dp.message_handler(commands=['main_menu'])
+@dp.message_handler(Text('main_menu'))
 async def help(message: types.Message):
-    """Help Command"""
-    await message.reply("Commands:"
-                        "\n/coin_list - see the list of added coins"
-                        "\n/add_coin - add coin"
-                        "\n/delete_coin - delete coin"
-                        "\n/help - help is help")
+    pass
 
 
-@dp.message_handler(commands=['add_coin'])
-@dp.message_handler(Text('Add Coin'))
-async def add_coin(message: types.Message):
-    """Add Coin Command"""
-
-    await message.reply('Send pair(for example, BTCUSDT, DOGEUSDT OR LTCUSDT)', reply_markup=finish())
+async def _add_coin_send_message(user_id):
+    await bot.send_message(user_id,
+                           'Send pair(for example, BTCUSDT, DOGEUSDT OR LTCUSDT)', reply_markup=finish())
     await AddCoin.coin_name.set()
+
+
+
+@dp.callback_query_handler(Text('add_coin'))
+async def add_coin(callback_query: types.CallbackQuery):
+    """Add Coin Command"""
+    user_id = callback_query.from_user.id
+    try:
+        await callback_query.message.delete()
+        await _add_coin_send_message(user_id)
+    except AttributeError:
+        await _add_coin_send_message(user_id)
+
 
 
 @dp.message_handler(state=AddCoin.coin_name)
@@ -70,6 +79,7 @@ async def save_coin(message: types.Message, state: FSMContext):
 
     if message.text and message.text != 'Finish':
         if is_correct_ticker(ticker) == False:
+
             await message.reply('Incorrect ticker, try again')
         else:
             await message.reply(add_new_coin(message.from_user.id, ticker))
@@ -77,42 +87,64 @@ async def save_coin(message: types.Message, state: FSMContext):
 
     if message.text == 'Finish':
         await state.finish()
-        await message.reply('OKAY! I went to monitor!', reply_markup=main_kb)
+        await message.reply('OKAY! I went to monitor!', reply_markup=main_inline_kb())
 
 
-@dp.message_handler(commands=['delete_coin'])
-@dp.message_handler(Text('Delete Coin'))
-async def delete_coin(message: types.Message):
+
+@dp.callback_query_handler(Text('delete_coin'))
+async def delete_coin(callback_query: types.CallbackQuery):
     """Delete Coin Command"""
-    try:
-        await message.reply('What do you want to delete?', reply_markup=create_inline_button_to_delete(message.from_user.id))
-        await message.reply('if you want to stop press finish', reply_markup=ReplyKeyboardRemove())
-    except:
-        await message.reply("Sorry, you don't have any coins (")
+    user_id = callback_query.from_user.id
+    if delete_coins_inline_kb(user_id=user_id) is not False:
+        try:
+            await callback_query.message.edit_text('What do you want to delete?',
+                           reply_markup=delete_coins_inline_kb(user_id))
+        except AttributeError:
+            await bot.send_message(user_id,
+                           'What do you want to delete?',
+                           reply_markup=delete_coins_inline_kb(user_id))
+    else:
+        await callback_query.message.edit_text( "Sorry, you don't have any coins (",
+                                                reply_markup=back_to_account_inline_kb())
 
 
-@dp.callback_query_handler()
+
+@dp.callback_query_handler(Text(startswith='ticker_'))
 async def delete_coin_callback(callback_query: types.CallbackQuery):
 
-    if callback_query.data != 'finish':
-        try:
-            delete_users_coin(userid=callback_query.from_user.id, ticker=callback_query.data)
-            await callback_query.answer(f'{callback_query.data} deleted', show_alert=False)
-            await callback_query.message.edit_text('What do you want to delete?',
-                                             reply_markup=create_inline_button_to_delete(callback_query.from_user.id))
-        except TypeError:
-            await callback_query.message.delete()
-            await bot.send_message(callback_query.from_user.id, "you removed all the coins. What's next?", reply_markup=main_kb)
-    else:
-        await callback_query.message.delete()
-        await bot.send_message(callback_query.from_user.id, "What's next?", reply_markup=main_kb)
+    try:
+        ticker = callback_query.data.split('_')[1]
+        delete_users_coin(userid=callback_query.from_user.id, ticker=ticker)
+        await callback_query.answer(f'{ticker} deleted', show_alert=False)
+        await callback_query.message.edit_text('What do you want to delete?',
+                                               reply_markup=delete_coins_inline_kb(callback_query.from_user.id))
+    except:
+        await callback_query.message.edit_text("You removed all the coins. What's next?", reply_markup=main_inline_kb())
 
 
-@dp.message_handler(commands=['coin_list'])
-@dp.message_handler(Text('Coin List'))
-async def coin_list(message: types.Message):
+@dp.callback_query_handler(Text('finish'))
+async def delete_coin_callback(callback_query: types.CallbackQuery):
+    await callback_query.message.delete()
+    await bot.send_message(callback_query.from_user.id, "What's next?", reply_markup=main_inline_kb())
+
+
+async def _get_coin_list(user_id):
+    return await bot.send_message(user_id, get_coin_list(user_id), reply_markup=main_inline_kb())
+
+
+@dp.callback_query_handler(Text('account'))
+async def coin_list(callback_query: types.CallbackQuery):
     """Coin List Command"""
-    await message.reply(get_coin_list(message.from_user.id))
+    user_id = callback_query.from_user.id
+    try:
+        await callback_query.message.edit_text(get_coin_list(user_id), reply_markup=main_inline_kb())
+    except:
+        await bot.send_message(user_id, get_coin_list(user_id), reply_markup=main_inline_kb())
+
+
+
+async def price_sending_schedule(message: types.Message):
+    pass
 
 
 if __name__ == '__main__':

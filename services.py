@@ -7,7 +7,6 @@ from aiogram.types import ReplyKeyboardRemove, \
     ReplyKeyboardMarkup, KeyboardButton, \
     InlineKeyboardMarkup, InlineKeyboardButton
 
-
 firebase = pyrebase.initialize_app(firebaseConfig)
 db = firebase.database()
 
@@ -72,7 +71,7 @@ def get_coin_list(userid):
         tickers_str = '\n\n'.join(coin_price)
         return f'{tickers_str}'
     except:
-        return 'you don\'t have any coins'
+        return "Sorry, you don't have any coins ("
 
 
 def delete_users_coin(userid, ticker):
@@ -88,13 +87,32 @@ def delete_users_coin(userid, ticker):
 def finish():
     btn_finish = KeyboardButton('Finish')
     finish_kb = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    return finish_kb.add(btn_finish)
+    finish_kb.add(btn_finish)
+    return finish_kb
 
 
-def create_inline_button_to_delete(user_id):
+def delete_coins_inline_kb(user_id):
+    try:
+        markup = InlineKeyboardMarkup()
+        all_coins = get_all_coins(user_id)
+        for coin in all_coins:
+            markup.add(InlineKeyboardButton(text=coin, callback_data=f'ticker_{coin}'))
+        markup.add(InlineKeyboardButton(text='Finish', callback_data='finish'))
+        return markup
+    except:
+        return False
+
+
+def main_inline_kb():
     markup = InlineKeyboardMarkup()
-    all_coins = get_all_coins(user_id)
-    for coin in all_coins:
-        markup.add(InlineKeyboardButton(text=coin, callback_data=f'{coin}'))
-    markup.add(InlineKeyboardButton(text='Finish', callback_data='finish'))
+    markup.add(InlineKeyboardButton(text='Add Coin', callback_data='add_coin'))
+    markup.add(InlineKeyboardButton(text='Delete Coin', callback_data='delete_coin'))
+    markup.add(InlineKeyboardButton(text='Account', callback_data='account'))
+    markup.add(InlineKeyboardButton(text='Price Sending Schedule', callback_data='price_sending'))
+    return markup
+
+
+def back_to_account_inline_kb():
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton(text='Back to Account', callback_data='account'))
     return markup
