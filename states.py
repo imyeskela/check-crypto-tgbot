@@ -1,6 +1,3 @@
-import logging
-from aiogram import Bot, Dispatcher, executor, types
-from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import StatesGroup, State
 
 
@@ -14,3 +11,10 @@ class AddCoin(BaseState):
 
 class DeleteCoin(BaseState):
     pass
+
+
+class Schedule(StatesGroup):
+    ticker = State()
+    time = State()
+
+

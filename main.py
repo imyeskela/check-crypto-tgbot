@@ -7,7 +7,7 @@ from aiogram.dispatcher.filters import Text
 from aiogram.dispatcher.filters.state import StatesGroup, State
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from config import TG_TOKEN
-from states import AddCoin, DeleteCoin
+from states import AddCoin, DeleteCoin, Schedule
 from aiogram.types import ReplyKeyboardRemove, \
     ReplyKeyboardMarkup, KeyboardButton, \
     InlineKeyboardMarkup, InlineKeyboardButton
@@ -16,7 +16,8 @@ from services import is_correct_ticker, add_new_user, \
     add_new_coin, get_coin_list, \
     get_all_coins, delete_users_coin, \
     finish, delete_coins_inline_kb, main_inline_kb, \
-    back_to_main_menu_inline_kb
+    back_to_main_menu_inline_kb, schedule_coin_list, \
+    time_inline_kb, schedule_menu_inline_kb
 
 
 logging.basicConfig(level=logging.INFO)
@@ -38,8 +39,9 @@ async def send_welcome(message: types.Message):
 
     add_new_user(message.from_user.id)
     await message.reply("Hi! I'm Chypto - Check Crypto Bot."
-                        "\nI will send you abnormal volumes and price of the coin", reply_markup=main_inline_kb())
-
+                        "\nI will send you abnormal volumes and price of the coin", )
+    await bot.send_message(message.from_user.id, 'Chypto — Check Crypto Bot'
+                                         '\nMain Menu', reply_markup=main_inline_kb())
 
 
 @dp.message_handler(commands=['main_menu'])
@@ -75,7 +77,8 @@ async def save_coin(message: types.Message, state: FSMContext):
 
     if message.text == 'Finish':
         await state.finish()
-        await message.reply('OKAY! I went to monitor!', reply_markup=back_to_main_menu_inline_kb())
+        await message.reply('OKAY!', reply_markup=ReplyKeyboardRemove())
+        await bot.send_message(message.from_user.id, 'I went to monitor!', reply_markup=back_to_main_menu_inline_kb())
 
 
 @dp.callback_query_handler(Text('delete_coin'))
@@ -86,7 +89,7 @@ async def delete_coin(callback_query: types.CallbackQuery):
         await callback_query.message.edit_text('What do you want to delete?',
                                                reply_markup=delete_coins_inline_kb(user_id))
     else:
-        await callback_query.message.edit_text( "Sorry, you don't have any coins (",
+        await callback_query.message.edit_text("Sorry, you don't have any coins (",
                                                 reply_markup=back_to_main_menu_inline_kb())
 
 
@@ -113,7 +116,30 @@ async def coin_list(callback_query: types.CallbackQuery):
         await callback_query.message.edit_text('Here you can see the coins that have been added', reply_markup=back_to_main_menu_inline_kb())
 
 
-async def price_sending_schedule(message: types.Message):
+@dp.callback_query_handler(Text('schedule_menu'))
+async def schedule_menu(callback_query: types.CallbackQuery):
+    await callback_query.message.edit_text('Schedule', reply_markup=schedule_menu_inline_kb())
+
+
+@dp.callback_query_handler(Text('my_schedule'))
+async def my_schedule(callback_query: types.CallbackQuery):
+    pass
+
+
+@dp.callback_query_handler(Text('new_schedule'))
+async def new_schedule(callback_query: types.CallbackQuery):
+    user_id = callback_query.from_user.id
+    coins_inline = schedule_coin_list(user_id)
+    if coins_inline != False:
+        await callback_query.message.edit_text('Choose a coin from the list', reply_markup=coins_inline)
+        # await Schedule.ticker.set()
+    else:
+        await callback_query.message.edit_text("Sorry, you don't have any coins (",
+                                               reply_markup=back_to_main_menu_inline_kb())
+
+
+@dp.callback_query_handler(Text(startswith='tickersch'))
+async def send_time_selection_schedule(callback_query: types.CallbackQuery):
     pass
 
 

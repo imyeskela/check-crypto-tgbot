@@ -1,7 +1,7 @@
-import json
+import asyncio
+import aioschedule
 import requests
 import pyrebase
-from collections.abc import Mapping
 from config import firebaseConfig
 from aiogram.types import ReplyKeyboardRemove, \
     ReplyKeyboardMarkup, KeyboardButton, \
@@ -15,7 +15,7 @@ def is_correct_ticker(ticker):
     binance_api = f"https://api.binance.com/api/v3/ticker/price?symbol="
     symbol = ticker.upper()
     try:
-        url = binance_api+symbol
+        url = binance_api + symbol
         data = requests.get(url)
         data = data.json()
         return data["price"]
@@ -84,11 +84,27 @@ def delete_users_coin(userid, ticker):
             return db.child('users').child(userid).child('tickers').child(key).remove()
 
 
+async def schedule_sending_price():
+    pass
+
+
+# BUTTONS
 def finish():
     btn_finish = KeyboardButton('Finish')
     finish_kb = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
     finish_kb.add(btn_finish)
     return finish_kb
+
+
+# def _coins_inline_kb(user_id):
+#     try:
+#         markup = InlineKeyboardMarkup()
+#         all_coins = get_all_coins(user_id)
+#         for coin in all_coins:
+#             markup.add(InlineKeyboardButton(text=coin, callback_data=f'ticker_{coin}'))
+#             return markup
+#     except:
+#         return False
 
 
 def delete_coins_inline_kb(user_id):
@@ -103,12 +119,44 @@ def delete_coins_inline_kb(user_id):
         return False
 
 
+# Schedule
+def schedule_menu_inline_kb():
+    markup = InlineKeyboardMarkup()
+    markup.row(InlineKeyboardButton(text='My Schedule', callback_data='my_schedule'),
+               InlineKeyboardButton(text='New Schedule', callback_data='new_schedule'))
+    markup.row(InlineKeyboardButton(text='Back to Main Menu', callback_data='main_menu'))
+    return markup
+
+
+def time_inline_kb():
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton(text='1 min', callback_data='time_1'))
+    markup.add(InlineKeyboardButton(text='5 min', callback_data='time_5'))
+    markup.add(InlineKeyboardButton(text='15 min', callback_data='time_15'))
+    markup.add(InlineKeyboardButton(text='30 min', callback_data='time_30'))
+    markup.add(InlineKeyboardButton(text='1 hour', callback_data='time_60'))
+    markup.add(InlineKeyboardButton(text='4 hour', callback_data='time_240'))
+    return markup
+
+
+def schedule_coin_list(user_id):
+    try:
+        markup = InlineKeyboardMarkup()
+        all_coins = get_all_coins(user_id)
+        for coin in all_coins:
+            markup.row(InlineKeyboardButton(text=coin, callback_data=f'tickersch_{coin}'))
+        markup.row(InlineKeyboardButton(text='Back', callback_data='schedule_menu'))
+        return markup
+    except:
+        return False
+
+
 def main_inline_kb():
     markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton(text='Add Coin', callback_data='add_coin'))
-    markup.add(InlineKeyboardButton(text='Delete Coin', callback_data='delete_coin'))
-    markup.add(InlineKeyboardButton(text='Coin List', callback_data='coin_list'))
-    markup.add(InlineKeyboardButton(text='Price Sending Schedule', callback_data='price_sending'))
+    markup.row(InlineKeyboardButton(text='Add Coin', callback_data='add_coin'),
+               InlineKeyboardButton(text='Delete Coin', callback_data='delete_coin'))
+    markup.row(InlineKeyboardButton(text='Coin List', callback_data='coin_list'),
+               InlineKeyboardButton(text='Price Sending Schedule', callback_data='schedule_menu'))
     return markup
 
 
