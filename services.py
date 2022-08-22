@@ -34,6 +34,18 @@ def add_new_user(id):
         return db.child('users').child(id).set(data)
 
 
+def get_users():
+    try:
+        users = db.child('users').get()
+        users_list = []
+        for user in users.each():
+            print(user.key())
+            users_list.append(user.key())
+        return users_list
+    except:
+        return ValueError
+
+
 def add_new_coin(userid, ticker):
     tickers = db.child('users').child(userid).child('tickers').get()
     try:
@@ -84,42 +96,44 @@ def delete_users_coin(userid, ticker):
             return db.child('users').child(userid).child('tickers').child(key).remove()
 
 
-async def schedule_sending_price():
-    pass
-
-
-# BUTTONS
-def finish():
-    btn_finish = KeyboardButton('Finish')
-    finish_kb = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    finish_kb.add(btn_finish)
-    return finish_kb
-
-
-# def _coins_inline_kb(user_id):
-#     try:
-#         markup = InlineKeyboardMarkup()
-#         all_coins = get_all_coins(user_id)
-#         for coin in all_coins:
-#             markup.add(InlineKeyboardButton(text=coin, callback_data=f'ticker_{coin}'))
-#             return markup
-#     except:
-#         return False
-
-
-def delete_coins_inline_kb(user_id):
+# Schedule
+def save_schedule(user_id, ticker, time):
+    schedule = db.child('users').child(user_id).child('schedule').get()
     try:
-        markup = InlineKeyboardMarkup()
-        all_coins = get_all_coins(user_id)
-        for coin in all_coins:
-            markup.add(InlineKeyboardButton(text=coin, callback_data=f'ticker_{coin}'))
-        markup.add(InlineKeyboardButton(text='Back to Main Menu', callback_data='main_menu'))
-        return markup
+        if ticker in schedule.val():
+            return f'{ticker} is already added'
+        else:
+            data = {ticker: time}
+            db.child('users').child(user_id).child('schedule').update(data)
+            return f'{ticker} added'
     except:
+        data = {ticker: time}
+        db.child('users').child(user_id).child('schedule').set(data)
+        return f'{ticker} added'
+
+
+def get_schedule_dict(user_id):
+    try:
+        schedule = db.child('users').child(user_id).child('schedule').get()
+        # print(dict(schedule.val()))
+        return dict(schedule.val())
+    except ValueError:
         return False
 
 
-# Schedule
+def get_my_schedule(user_id):
+    try:
+        schedule = get_schedule_dict(user_id=user_id)
+        schedule_list = []
+
+        for key, val in schedule.items():
+            schedule_list.append(f'{key} {val}min')
+        return '\n\n'.join(schedule_list)
+    except:
+        print('error')
+        return False
+
+
 def schedule_menu_inline_kb():
     markup = InlineKeyboardMarkup()
     markup.row(InlineKeyboardButton(text='My Schedule', callback_data='my_schedule'),
@@ -130,12 +144,15 @@ def schedule_menu_inline_kb():
 
 def time_inline_kb():
     markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton(text='1 min', callback_data='time_1'))
-    markup.add(InlineKeyboardButton(text='5 min', callback_data='time_5'))
-    markup.add(InlineKeyboardButton(text='15 min', callback_data='time_15'))
-    markup.add(InlineKeyboardButton(text='30 min', callback_data='time_30'))
-    markup.add(InlineKeyboardButton(text='1 hour', callback_data='time_60'))
-    markup.add(InlineKeyboardButton(text='4 hour', callback_data='time_240'))
+    markup.row(InlineKeyboardButton(text='1 min', callback_data='time_1'),
+               InlineKeyboardButton(text='5 min', callback_data='time_5'),
+               InlineKeyboardButton(text='15 min', callback_data='time_15')
+               )
+    markup.row(InlineKeyboardButton(text='30 min', callback_data='time_30'),
+               InlineKeyboardButton(text='1 hour', callback_data='time_60'),
+               InlineKeyboardButton(text='4 hour', callback_data='time_240')
+               )
+    markup.row(InlineKeyboardButton(text='Back to Main Menu', callback_data='main_menu'))
     return markup
 
 
@@ -146,6 +163,34 @@ def schedule_coin_list(user_id):
         for coin in all_coins:
             markup.row(InlineKeyboardButton(text=coin, callback_data=f'tickersch_{coin}'))
         markup.row(InlineKeyboardButton(text='Back', callback_data='schedule_menu'))
+        return markup
+    except:
+        return False
+
+
+def final_schedule():
+    markup = InlineKeyboardMarkup()
+    markup.row(InlineKeyboardButton(text='New Schedule', callback_data='new_schedule'),
+               InlineKeyboardButton(text='Back to Schedule Menu', callback_data='schedule_menu'))
+    return markup
+
+
+# BUTTONS
+def finish():
+    btn_finish = KeyboardButton('Finish')
+    finish_kb = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    finish_kb.add(btn_finish)
+    return finish_kb
+
+
+
+def delete_coins_inline_kb(user_id):
+    try:
+        markup = InlineKeyboardMarkup()
+        all_coins = get_all_coins(user_id)
+        for coin in all_coins:
+            markup.add(InlineKeyboardButton(text=coin, callback_data=f'ticker_{coin}'))
+        markup.add(InlineKeyboardButton(text='Back to Main Menu', callback_data='main_menu'))
         return markup
     except:
         return False

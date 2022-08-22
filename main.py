@@ -1,5 +1,6 @@
 import logging
-
+import asyncio
+import aioschedule
 import aiogram.utils.exceptions
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.dispatcher import FSMContext
@@ -17,7 +18,8 @@ from services import is_correct_ticker, add_new_user, \
     get_all_coins, delete_users_coin, \
     finish, delete_coins_inline_kb, main_inline_kb, \
     back_to_main_menu_inline_kb, schedule_coin_list, \
-    time_inline_kb, schedule_menu_inline_kb
+    time_inline_kb, schedule_menu_inline_kb, final_schedule, \
+    save_schedule, get_my_schedule, get_schedule_dict, get_users
 
 
 logging.basicConfig(level=logging.INFO)
@@ -123,25 +125,51 @@ async def schedule_menu(callback_query: types.CallbackQuery):
 
 @dp.callback_query_handler(Text('my_schedule'))
 async def my_schedule(callback_query: types.CallbackQuery):
-    pass
+    # get_schedule_dict(callback_query.from_user.id)
+    await callback_query.message.edit_text(get_my_schedule(callback_query.from_user.id), reply_markup=back_to_main_menu_inline_kb())
 
 
 @dp.callback_query_handler(Text('new_schedule'))
-async def new_schedule(callback_query: types.CallbackQuery):
+async def new_schedule_coin_selection(callback_query: types.CallbackQuery):
     user_id = callback_query.from_user.id
     coins_inline = schedule_coin_list(user_id)
     if coins_inline != False:
         await callback_query.message.edit_text('Choose a coin from the list', reply_markup=coins_inline)
-        # await Schedule.ticker.set()
     else:
         await callback_query.message.edit_text("Sorry, you don't have any coins (",
                                                reply_markup=back_to_main_menu_inline_kb())
 
 
-@dp.callback_query_handler(Text(startswith='tickersch'))
-async def send_time_selection_schedule(callback_query: types.CallbackQuery):
-    pass
+@dp.message_handler(state=AddCoin.coin_name)
+@dp.callback_query_handler(Text(startswith='tickersch_'))
+async def send_time_selection_schedule(callback_query: types.CallbackQuery, state: FSMContext):
+    await state.update_data(ticker=callback_query.data)
+    await callback_query.message.edit_text('Choose the time', reply_markup=time_inline_kb())
+
+
+@dp.message_handler(state=AddCoin.coin_name)
+@dp.callback_query_handler(Text(startswith='time_'))
+async def end_of_schedule_selection(callback_query: types.CallbackQuery, state: FSMContext):
+    await state.update_data(time=callback_query.data)
+    data = await state.get_data()
+    save_schedule(ticker=data['ticker'].split('_')[1], time=data['time'].split('_')[1], user_id=callback_query.from_user.id)
+    await callback_query.message.edit_text(f'{data}', reply_markup=final_schedule())
+
+# async def sending_price_schedule(message: types.Message):
+#     user_id = message.from_user.id
+#     user_schedule = get_schedule_dict(user_id)
+#     loop = asyncio.get_event_loop()
+#
+#     if user_id and user_schedule != False:
+#         for ticker, min in user_schedule.items():
+#             print(user_id)
+#             return await bot.send_message(user_id, f'{ticker} {is_correct_ticker(ticker)}')
+#
+#     while True:
+#         loop.run_until_complete(aioschedule.run_pending())
 
 
 if __name__ == '__main__':
     executor.start_polling(dp, skip_updates=True)
+
+
